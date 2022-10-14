@@ -5,6 +5,7 @@ Micro-service to make it easier to delivery packages in Kafka
 - This will create a Kafka application that will deliver packages using Faust and 
 communicate with Front-end with WebSocket.
 </br>
+
 ```
      ws           kafka-stream
 FE <----> Faust <--------------> Kafka-mcs
