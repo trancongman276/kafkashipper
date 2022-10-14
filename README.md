@@ -9,6 +9,7 @@ communicate with Front-end with WebSocket.
      ws           kafka-stream
 FE <----> Faust <--------------> Kafka-mcs
 ```
+
 - FE will send data with bellow format to Faust server using Websocket: 
 
 `JSON({'id': ... , 'header': ..., 'data': ...})` 
