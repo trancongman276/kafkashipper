@@ -5,10 +5,12 @@ Microservice to make it easier to delivery packages in Kafka.
 - This will create a Kafka application that will deliver packages using Faust and 
 communicate with Front-end with WebSocket.
 </br>
+
 ```
      ws           kafka-stream
 FE <----> Faust <--------------> Kafka-mcs
 ```
+
 - FE will send data with bellow format to Faust server using Websocket: 
 
 `JSON({'id': ... , 'header': ..., 'body': ...})` 
