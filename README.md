@@ -1,29 +1,34 @@
-# kafkashipper
+# KafkaShipper
 Microservice to make it easier to delivery packages in Kafka.
 
 # Idea
-- This will create a Kafka application that will deliver packages using Faust and 
-communicate with Front-end with WebSocket.
-</br>
+This service will create a Kafka application that deliver messages using Faust and communicate with Front-end using WebSocket. </br>
 
 ```
-     ws           kafka-stream
-FE <----> Faust <--------------> Kafka-mcs
+            WebSocket           Kafka-Stream
+Front-end <-----------> Faust <--------------> Kafka-Mcs
 ```
 
-- FE will send data with bellow format to Faust server using Websocket: 
+Front-end is expected to send data with the bellow format to Faust server using Websocket:
 
-`JSON({'id': ... , 'header': ..., 'body': ...})` 
+```
+JSON({
+    "id": "..." ,
+    "headers": "..." ,
+    "body": "..."
+    })`
+```
 
-- Where _header_ is the ***list of mcs*** that project need,</br>
-_data_ is the contain (text, image, etc.)</br>
-_id_ is the identity of the FE.
+Where:
+- *headers* is a list(tuple(str(int), byte)). Faust will parse this to a dictionary where each tuple is an item with
+the first element is the key and the second is its value. KafkaShipper will pop the lowest key and use the decoded byte
+value as the next Kafka topic where the target microservice consumes from.</br>
+- *body* contain the actual data will be sent to the designated microservice.</br>
+- *id* is a unique identity string of front-end client.</br>
 
-- This Websocket is running in background will send the given message to 
-Faust KafkaShipper topic and sent to the mcs(s). 
+Websocket running in the background will send the given message to Faust KafkaShipper then to microservice(s).
 
-- Finally, this process will repeat until the list of header is empty and send back
-to the FE through Websocket.
+This process will repeat until the headers is empty then Shipper will send the result back to the front-end client through Websocket.
 
 # Usages
 - Run faust
@@ -33,11 +38,8 @@ python faust_ws.py worker -l INFO --without-web
 - Input format example:
 ```json
 {
-  "id": "1",
-  "header": ["topic1", "topic2"],
-  "body": ["hello world"]
+  "id": "32764296-e578-4035-b15e-d4e847f3e48a",
+  "headers": [('1', b'mcs_1'), ('2', b'mcs_2')],
+  "body": "hello world"
 }
 ```
-
-And that's it. Try it on your own websocket.
-

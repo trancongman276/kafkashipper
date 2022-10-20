@@ -1,46 +1,30 @@
-import os
-import ast
-import json
-import asyncio
 import logging
+import os
 
 from faust import App
 
 # Get config from env
-ks_host = os.getenv("KAFKA_HOST", "kafka:9092")
-batch_size = int(os.getenv("BATCH_SIZE", "8"))
-timeout = float(os.getenv("TIMEOUT", "0.1"))
+KAFKA_HOST = os.getenv("KAFKA_HOST", "kafka://staging01.gradients.host:9093")
 
 # Init Kafa
-app = App('kafka_shipper', broker=[ks_host], value_serializer='raw', debug=True)
+app = App('shipper', broker=[KAFKA_HOST], value_serializer='raw', debug=True)
 logger = logging.getLogger('kafka_shipper')
-connected_clients = {}
+CONNECTED_CLIENTS = {}
+
+shipper = app.topic('shipper')
 
 
-# KafkaShipper topic
-pipe_in = app.topic('kafka_shipper_in')
-
-
-@app.agent(pipe_in)
+@app.agent(shipper)
 async def consume_pipe_in(stream):
-    async for record in stream.take(batch_size, within=timeout):
-        route_ls = []
-        # Take record from batch
-        for value in record:
-            data = ast.literal_eval(value.decode())
-            # Check if message is finished or not
-            if len(data['header']) == 0:
-                _id = data['id']
-                # Send back to client through WS
-                connected_clients[_id]['ws'].send(connected_clients[_id]['data'])
-                continue
-            # Get next topic
-            topic = app.topic(data['header'][0])
-            data['header'] = data['header'][1:]
-            route_ls.append([topic, json.dumps(data)])
-        tasks = []
-        # Delivery topic
-        for topic, data in route_ls:
-            task = asyncio.create_task(topic.send(value=data.encode()))
-            tasks.append(task)
-        await asyncio.gather(*tasks)
+    async for event in stream.events():
+        e_headers = event.headers
+        e_id = event.key
+        e_value = event.value
+
+        if not len(e_headers):
+            CONNECTED_CLIENTS[e_id].send(e_value)
+            continue
+
+        next_topic = e_headers.pop(min(e_headers.keys())).decode()
+        topic = app.topic(next_topic)
+        await topic.send(value=e_value, headers=e_headers, key=e_id)

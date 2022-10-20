@@ -1,69 +1,48 @@
-import os
 import ast
 import asyncio
+import os
+
 import websockets
-
-import dotenv
-dotenv.load_dotenv()
-
-from jsonschema import validate
-from jsonschema.exceptions import ValidationError
-
-from faust_app import app, connected_clients
 from websockets.legacy.server import WebSocketServerProtocol
 
-# Input message format
-schema = {
-    "type": "object",
-    "properties": {
-        "header": {"type": "array"},
-        "body": {"type": "array"},
-        "id": {"type": "string"}
-    }
-}
+from faust_app import CONNECTED_CLIENTS, app
 
 # Get config from env
-ws_host = os.getenv('WS_HOST', 'localhost')
-ws_port = os.getenv('WS_PORT', '8765')
+WS_HOST = os.getenv('WS_HOST', 'localhost')
+WS_PORT = os.getenv('WS_PORT', '8765')
 
 
-async def on_message(ws, message):
-    """
-    Solve for each message
-    :param ws:          WebSocket Server Protocol
-    :param message:     Message receive from WebSocket
-    :return:
-    """
-    msg = ast.literal_eval(message)
-    try:
-        # Validate json input
-        validate(msg, schema=schema)
-    except ValidationError as e:
-        await ws.send(str(e))
-        return
-    # Get ID from WS message
-    _id = msg['id']
-    # Init ws data if it hasn't existed
-    if _id not in connected_clients:
-        connected_clients[_id] = {'ws': ws}
-    connected_clients[_id]['data'] = message
-    # Send to kafka
-    await app.send('kafka_shipper_in', value=message)
+def remove_closed_sockets():
+    # Create a 'keys' list to avoid
+    # RuntimeError: dictionary changed size during iteration
+    keys = list(CONNECTED_CLIENTS.keys())
+    for key in keys:
+        if CONNECTED_CLIENTS[key].closed:
+            CONNECTED_CLIENTS.pop(key)
 
 
-async def on_messages(ws: WebSocketServerProtocol) -> None:
-    # Check for closed WS
-    for i in range(len(connected_clients)):
-        key = list(connected_clients.keys())[i]
-        if connected_clients[key]['ws'].closed:
-            connected_clients.pop(key)
-    # Solve data
+def open_socket(client_id, ws):
+    if client_id not in CONNECTED_CLIENTS:
+        CONNECTED_CLIENTS[client_id] = ws
+
+
+async def on_message(ws: WebSocketServerProtocol) -> None:
+    remove_closed_sockets()
     async for message in ws:
-        await on_message(ws, message)
+        message = ast.literal_eval(message)
+        msg_id = message['id']
+        msg_headers = ast.literal_eval(message['headers'])
+        msg_body = message['body']
+
+        open_socket(msg_id, ws)
+        await app.send('shipper',
+                       value=msg_body,
+                       key=msg_id,
+                       headers=msg_headers)
 
 
 async def socket():
-    async with websockets.serve(on_messages, ws_host, ws_port):
+    async with websockets.serve(on_message, WS_HOST, WS_PORT):
         await asyncio.Future()  # run forever
 
 
