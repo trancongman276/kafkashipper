@@ -1,7 +1,7 @@
 # KafkaShipper
 Microservice to make it easier to delivery packages in Kafka.
 
-# Idea
+## Idea
 This service will create a Kafka application that deliver messages using Faust and communicate with Front-end using WebSocket. </br>
 
 ```
@@ -11,12 +11,12 @@ Front-end <-----------> Faust <--------------> Kafka-Mcs
 
 Front-end is expected to send data with the bellow format to Faust server using Websocket:
 
-```
-JSON({
-    "id": "..." ,
-    "headers": "..." ,
-    "body": "..."
-    })`
+```json
+{
+  "id": "32764296-e578-4035-b15e-d4e847f3e48a",
+  "headers": [('1', b'mcs_1'), ('2', b'mcs_2')],
+  "body": "hello world"
+}
 ```
 
 Where:
@@ -30,16 +30,7 @@ Websocket running in the background will send the given message to Faust KafkaSh
 
 This process will repeat until the headers is empty then Shipper will send the result back to the front-end client through Websocket.
 
-# Usages
-- Run faust
+## Usage
 ```commandline
-python faust_ws.py worker -l INFO --without-web
-```
-- Input format example:
-```json
-{
-  "id": "32764296-e578-4035-b15e-d4e847f3e48a",
-  "headers": [('1', b'mcs_1'), ('2', b'mcs_2')],
-  "body": "hello world"
-}
+python app.py worker -l INFO --without-web
 ```

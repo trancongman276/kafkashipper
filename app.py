@@ -1,15 +1,26 @@
 import ast
 import asyncio
+import logging
 import os
 
 import websockets
+from faust import App
 from websockets.legacy.server import WebSocketServerProtocol
 
-from faust_app import CONNECTED_CLIENTS, app
+# Get config from env
+KAFKA_HOST = os.getenv("KAFKA_HOST", "kafka://staging01.gradients.host:9093")
 
 # Get config from env
 WS_HOST = os.getenv('WS_HOST', 'localhost')
 WS_PORT = os.getenv('WS_PORT', '8765')
+
+# Init Kafa
+app = App('shipper', broker=[KAFKA_HOST], value_serializer='raw', debug=True)
+logger = logging.getLogger('kafka_shipper')
+CONNECTED_CLIENTS = {}
+
+shipper_in = app.topic('shipper_in')
+shipper_out = app.topic('shipper_out')
 
 
 def remove_closed_sockets():
@@ -35,7 +46,7 @@ async def on_message(ws: WebSocketServerProtocol) -> None:
         msg_body = message['body']
 
         open_socket(msg_id, ws)
-        await app.send('shipper',
+        await app.send('shipper_in',
                        value=msg_body,
                        key=msg_id,
                        headers=msg_headers)
@@ -44,6 +55,25 @@ async def on_message(ws: WebSocketServerProtocol) -> None:
 async def socket():
     async with websockets.serve(on_message, WS_HOST, WS_PORT):
         await asyncio.Future()  # run forever
+
+
+@app.agent(shipper_in)
+async def consume_pipe_in(stream):
+    async for event in stream.events():
+        e_headers = event.headers
+        e_id = event.key
+        e_value = event.value
+        logger.info(f"Message from {e_id} to {e_headers} value {e_value}")
+
+        if not len(e_headers):
+            await shipper_out.send(value=e_value, key=e_id)
+            logger.info("Sent to shipper_out")
+            CONNECTED_CLIENTS[e_id].send(e_value)
+            continue
+
+        next_topic = e_headers.pop(min(e_headers.keys())).decode()
+        topic = app.topic(next_topic)
+        await topic.send(value=e_value, headers=e_headers, key=e_id)
 
 
 app.add_future(socket())
