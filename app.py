@@ -68,7 +68,7 @@ async def consume_pipe_in(stream):
         if not len(e_headers):
             await shipper_out.send(value=e_value, key=e_id)
             logger.info("Sent to shipper_out")
-            CONNECTED_CLIENTS[e_id].send(e_value)
+            CONNECTED_CLIENTS[e_id.decode()].send(e_value)
             continue
 
         next_topic = e_headers.pop(min(e_headers.keys())).decode()
