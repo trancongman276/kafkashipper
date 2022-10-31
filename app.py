@@ -60,15 +60,16 @@ async def socket():
 @app.agent(shipper_in)
 async def consume_pipe_in(stream):
     async for event in stream.events():
+        logger.info(event)
         e_headers = event.headers
         e_id = event.key
         e_value = event.value
-        logger.info(f"Message from {e_id} to {e_headers} value {e_value}")
 
         if not len(e_headers):
             await shipper_out.send(value=e_value, key=e_id)
             logger.info("Sent to shipper_out")
-            CONNECTED_CLIENTS[e_id.decode()].send(e_value)
+            if e_id is not None:
+                CONNECTED_CLIENTS[e_id.decode()].send(e_value)
             continue
 
         next_topic = e_headers.pop(min(e_headers.keys())).decode()
