@@ -60,7 +60,7 @@ async def socket():
 @app.agent(shipper_in)
 async def consume_pipe_in(stream):
     async for event in stream.events():
-        logger.info(event)
+        logger.info(f"{event}, {event.headers}")
         e_headers = event.headers
         e_id = event.key
         e_value = event.value
