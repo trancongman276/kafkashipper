@@ -15,7 +15,7 @@ Front-end is expected to send data with the bellow format to Faust server using 
 {
   "id": "32764296-e578-4035-b15e-d4e847f3e48a",
   "headers": [('1', b'mcs_1'), ('2', b'mcs_2')],
-  "body": "hello world"
+  "body": {"data": "hello world"}
 }
 ```
 
