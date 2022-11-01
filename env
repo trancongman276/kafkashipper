@@ -1,8 +1,0 @@
-# WebSocket
-WS_HOST=
-WS_PORT=
-
-# Kafka
-KAFKA_HOST=
-BATCH_SIZE=
-TIMEOUT=
