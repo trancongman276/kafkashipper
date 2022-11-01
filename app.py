@@ -42,13 +42,16 @@ async def on_message(ws: WebSocketServerProtocol) -> None:
     async for message in ws:
         message = ast.literal_eval(message)
         msg_id = message['id']
-        msg_headers = ast.literal_eval(message['headers'])
+        for header in message['headers']:
+            # ['key', 'topic']
+            header[1] = header[1].encode()
+        msg_headers = list(tuple(header) for header in message['headers'])
         msg_body = message['body']
 
         open_socket(msg_id, ws)
         await app.send('shipper_in',
-                       value=msg_body,
-                       key=msg_id,
+                       value=f"{msg_body}".encode(),
+                       key=f"{msg_id}".encode(),
                        headers=msg_headers)
 
 
@@ -69,7 +72,7 @@ async def consume_pipe_in(stream):
             await shipper_out.send(value=e_value, key=e_id)
             logger.info("Sent to shipper_out")
             if e_id is not None:
-                CONNECTED_CLIENTS[e_id.decode()].send(e_value)
+                await CONNECTED_CLIENTS[e_id.decode()].send(e_value)
             continue
 
         next_topic = e_headers.pop(min(e_headers.keys())).decode()
